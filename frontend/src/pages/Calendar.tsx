@@ -15,10 +15,10 @@ import { clsx } from 'clsx';
 import { ChevronLeft, ChevronRight, X, ShieldCheck, Calendar as CalendarIcon, DollarSign, TrendingDown } from 'lucide-react';
 import { useSelectedProperty } from '../components/Layout';
 import { useCalendar, useCheapestSummary } from '../hooks/useApi';
-import { ChannelColorBar, ChannelLegend, getChannelColor } from '../components/ChannelBadge';
+import { ChannelLegend, getChannelColor } from '../components/ChannelBadge';
 import KpiCard from '../components/KpiCard';
 import { PageSkeleton } from '../components/LoadingSkeleton';
-import type { CalendarDay, CalendarChannel } from '../types';
+import type { CalendarDay } from '../types';
 
 const PARITY_DOT_COLORS = {
   ok: 'bg-success',
@@ -36,7 +36,7 @@ export default function Calendar() {
 
   const monthStr = format(currentMonth, 'yyyy-MM');
   const { data: calendarDays, isLoading } = useCalendar(selectedProperty?.id, monthStr);
-  const { data: summary } = useCheapestSummary(selectedProperty?.id, monthStr);
+  const { data: summaryData } = useCheapestSummary(selectedProperty?.id, monthStr);
 
   const dayMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -51,6 +51,13 @@ export default function Calendar() {
     const calEnd = endOfWeek(monthEnd);
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
+
+  // Derive summary KPIs from cheapest summary array
+  const topCheapest = summaryData?.[0];
+  const totalCheapestDays = summaryData?.reduce((sum, s) => sum + Number(s.cheapest_count), 0) ?? 0;
+  const avgRate = summaryData?.length
+    ? summaryData.reduce((sum, s) => sum + Number(s.avg_rate), 0) / summaryData.length
+    : 0;
 
   if (isLoading) return <PageSkeleton />;
 
@@ -84,29 +91,29 @@ export default function Calendar() {
       </div>
 
       {/* KPI Summary */}
-      {summary && (
+      {summaryData && summaryData.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
-            label="Days with Parity"
-            value={`${summary.daysWithParity}/${summary.totalDays}`}
-            variant={summary.daysWithParity / summary.totalDays >= 0.8 ? 'success' : 'danger'}
+            label="Days Tracked"
+            value={totalCheapestDays}
+            variant="default"
             icon={<ShieldCheck className="w-5 h-5" />}
           />
           <KpiCard
             label="Most Frequent Cheapest"
-            value={summary.mostFrequentCheapest || 'N/A'}
+            value={topCheapest?.competitor_name ?? 'N/A'}
             variant="default"
             icon={<CalendarIcon className="w-5 h-5" />}
           />
           <KpiCard
-            label="Avg Undercut Amount"
-            value={`$${summary.avgUndercutAmount.toFixed(0)}`}
-            variant={summary.avgUndercutAmount > 10 ? 'danger' : 'success'}
+            label="Cheapest Min Rate"
+            value={topCheapest ? `$${Number(topCheapest.min_rate).toFixed(0)}` : 'N/A'}
+            variant="accent"
             icon={<TrendingDown className="w-5 h-5" />}
           />
           <KpiCard
-            label="Our Avg Rate"
-            value={`$${summary.ourAvgRate.toFixed(0)}`}
+            label="Average Rate"
+            value={avgRate > 0 ? `$${avgRate.toFixed(0)}` : 'N/A'}
             variant="accent"
             icon={<DollarSign className="w-5 h-5" />}
           />
@@ -152,7 +159,7 @@ export default function Calendar() {
                 const dateStr = format(date, 'yyyy-MM-dd');
                 const dayData = dayMap.get(dateStr);
                 const inMonth = isSameMonth(date, currentMonth);
-                const today = isToday(date);
+                const todayDate = isToday(date);
                 const isSelected = selectedDay?.date === dateStr;
                 const topChannels = dayData?.channels?.slice(0, 3) ?? [];
 
@@ -164,7 +171,7 @@ export default function Calendar() {
                     className={clsx(
                       'relative min-h-[100px] p-2 border-b border-r border-white/5 text-left transition-all duration-200',
                       inMonth ? 'hover:bg-white/[0.03] cursor-pointer' : 'opacity-30 cursor-default',
-                      today && 'ring-1 ring-accent/50 ring-inset bg-accent/[0.03]',
+                      todayDate && 'ring-1 ring-accent/50 ring-inset bg-accent/[0.03]',
                       isSelected && 'bg-accent/5 ring-1 ring-accent/40 ring-inset'
                     )}
                   >
@@ -173,7 +180,7 @@ export default function Calendar() {
                       <span
                         className={clsx(
                           'text-xs font-rate',
-                          today ? 'text-accent font-bold' : inMonth ? 'text-slate-400' : 'text-slate-700'
+                          todayDate ? 'text-accent font-bold' : inMonth ? 'text-slate-400' : 'text-slate-700'
                         )}
                       >
                         {format(date, 'd')}

@@ -8,14 +8,14 @@ import ChannelBadge from '../components/ChannelBadge';
 import { PageSkeleton } from '../components/LoadingSkeleton';
 import type { ParityAlert } from '../types';
 
-type SortField = 'competitorName' | 'checkIn' | 'ourRate' | 'theirRate' | 'differencePercent' | 'detectedAt';
+type SortField = 'competitor_name' | 'check_in_date' | 'our_rate' | 'competitor_rate' | 'difference_pct' | 'detected_at';
 type SortDir = 'asc' | 'desc';
 type FilterTab = 'all' | 'new' | 'acknowledged';
 
 export default function ParityAlerts() {
   const { selectedProperty } = useSelectedProperty();
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
-  const [sortField, setSortField] = useState<SortField>('detectedAt');
+  const [sortField, setSortField] = useState<SortField>('detected_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const statusParam = filterTab === 'all' ? undefined : filterTab;
@@ -25,8 +25,8 @@ export default function ParityAlerts() {
   const sorted = useMemo(() => {
     if (!alerts) return [];
     return [...alerts].sort((a, b) => {
-      let aVal: string | number = a[sortField] as string | number;
-      let bVal: string | number = b[sortField] as string | number;
+      const aVal = (a as unknown as Record<string, unknown>)[sortField] as string | number;
+      const bVal = (b as unknown as Record<string, unknown>)[sortField] as string | number;
       if (typeof aVal === 'string') {
         const cmp = aVal.localeCompare(bVal as string);
         return sortDir === 'asc' ? cmp : -cmp;
@@ -80,7 +80,7 @@ export default function ParityAlerts() {
               <span className="ml-1 text-[10px] opacity-60">
                 ({tab.key === 'all'
                   ? alerts.length
-                  : alerts.filter((a) => (tab.key === 'new' ? a.status === 'new' : a.status === 'acknowledged')).length
+                  : alerts.filter((a) => (tab.key === 'new' ? a.alert_status === 'new' : a.alert_status === 'acknowledged')).length
                 })
               </span>
             )}
@@ -95,12 +95,12 @@ export default function ParityAlerts() {
             <thead>
               <tr className="border-b border-white/5">
                 {[
-                  { field: 'competitorName' as SortField, label: 'Competitor' },
-                  { field: 'checkIn' as SortField, label: 'Check-in Date' },
-                  { field: 'ourRate' as SortField, label: 'Our Rate' },
-                  { field: 'theirRate' as SortField, label: 'Their Rate' },
-                  { field: 'differencePercent' as SortField, label: 'Difference' },
-                  { field: 'detectedAt' as SortField, label: 'Detected' },
+                  { field: 'competitor_name' as SortField, label: 'Competitor' },
+                  { field: 'check_in_date' as SortField, label: 'Check-in Date' },
+                  { field: 'our_rate' as SortField, label: 'Our Rate' },
+                  { field: 'competitor_rate' as SortField, label: 'Their Rate' },
+                  { field: 'difference_pct' as SortField, label: 'Difference' },
+                  { field: 'detected_at' as SortField, label: 'Detected' },
                 ].map(({ field, label }) => (
                   <th
                     key={field}
@@ -137,63 +137,63 @@ export default function ParityAlerts() {
                     key={alert.id}
                     className={clsx(
                       'border-b border-white/5 transition-colors hover:bg-white/[0.02]',
-                      alert.status === 'new' && 'bg-danger/[0.03]'
+                      alert.alert_status === 'new' && 'bg-danger/[0.03]'
                     )}
                   >
                     <td className="px-4 py-3">
-                      <div className="text-sm text-slate-200">{alert.competitorName}</div>
-                      <ChannelBadge source={alert.source} className="mt-1" />
+                      <div className="text-sm text-slate-200">{alert.competitor_name ?? 'Unknown'}</div>
+                      <ChannelBadge source="Google Hotels" className="mt-1" />
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-rate text-xs text-slate-300">
-                        {format(new Date(alert.checkIn), 'MMM d, yyyy')}
+                        {format(new Date(alert.check_in_date + 'T00:00:00'), 'MMM d, yyyy')}
                       </span>
-                      {alert.roomType && (
-                        <div className="text-[10px] text-slate-500 mt-0.5">{alert.roomType}</div>
+                      {alert.room_type && (
+                        <div className="text-[10px] text-slate-500 mt-0.5">{alert.room_type}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-rate font-semibold text-accent">
-                        ${alert.ourRate.toFixed(0)}
+                        ${Number(alert.our_rate).toFixed(0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-rate font-semibold text-slate-200">
-                        ${alert.theirRate.toFixed(0)}
+                        ${Number(alert.competitor_rate).toFixed(0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={clsx(
                           'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-rate font-semibold',
-                          alert.differencePercent < -5
+                          Number(alert.difference_pct) < -5
                             ? 'bg-danger/20 text-danger'
-                            : alert.differencePercent < -2
+                            : Number(alert.difference_pct) < -2
                             ? 'bg-yellow-500/20 text-yellow-400'
-                            : alert.differencePercent < 0
+                            : Number(alert.difference_pct) < 0
                             ? 'bg-yellow-500/10 text-yellow-500'
                             : 'bg-success/20 text-success'
                         )}
                       >
-                        {alert.differencePercent > 0 ? '+' : ''}
-                        {alert.differencePercent.toFixed(1)}%
+                        {Number(alert.difference_pct) > 0 ? '+' : ''}
+                        {Number(alert.difference_pct).toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-rate text-[11px] text-slate-500">
-                        {format(new Date(alert.detectedAt), 'MMM d, HH:mm')}
+                        {format(new Date(alert.detected_at), 'MMM d, HH:mm')}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={clsx(
                           'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
-                          alert.status === 'new'
+                          alert.alert_status === 'new'
                             ? 'bg-danger/10 text-danger border border-danger/20'
                             : 'bg-success/10 text-success border border-success/20'
                         )}
                       >
-                        {alert.status === 'new' ? (
+                        {alert.alert_status === 'new' ? (
                           <>
                             <AlertTriangle className="w-2.5 h-2.5" />
                             New
@@ -207,7 +207,7 @@ export default function ParityAlerts() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {alert.status === 'new' && (
+                      {alert.alert_status === 'new' && (
                         <button
                           onClick={() => acknowledgeMutation.mutate(alert.id)}
                           disabled={acknowledgeMutation.isPending}

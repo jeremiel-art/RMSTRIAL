@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
 import {
   Plus,
@@ -11,6 +11,11 @@ import {
   Coins,
   Globe,
   Save,
+  Search,
+  X,
+  Star,
+  MapPin,
+  Loader2,
 } from 'lucide-react';
 import { useSelectedProperty } from '../components/Layout';
 import {
@@ -19,8 +24,9 @@ import {
   useDeleteCompetitor,
   useToggleCompetitor,
   useUpdateProperty,
+  useSearchHotels,
 } from '../hooks/useApi';
-import ChannelBadge from '../components/ChannelBadge';
+import type { HotelSearchResult } from '../hooks/useApi';
 import { PageSkeleton } from '../components/LoadingSkeleton';
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'THB', 'JPY', 'AUD', 'SGD', 'INR', 'AED'];
@@ -33,36 +39,47 @@ export default function Settings() {
   const toggleMutation = useToggleCompetitor();
   const updateMutation = useUpdateProperty();
 
-  const [newName, setNewName] = useState('');
-  const [newSource, setNewSource] = useState('');
-  const [newUrl, setNewUrl] = useState('');
-
-  const [parityThreshold, setParityThreshold] = useState(
-    selectedProperty?.parityThreshold?.toString() ?? '3'
+  // Search-based competitor adding
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const { data: searchResults, isLoading: isSearching } = useSearchHotels(
+    showSearch ? searchQuery : ''
   );
-  const [lookAheadDays, setLookAheadDays] = useState(
-    selectedProperty?.lookAheadDays?.toString() ?? '30'
-  );
-  const [currency, setCurrency] = useState(selectedProperty?.currency ?? 'USD');
 
-  const handleAddCompetitor = () => {
-    if (!selectedProperty || !newName.trim() || !newSource.trim()) return;
-    addMutation.mutate(
-      {
-        propertyId: selectedProperty.id,
-        name: newName.trim(),
-        source: newSource.trim(),
-        url: newUrl.trim(),
-      },
-      {
-        onSuccess: () => {
-          setNewName('');
-          setNewSource('');
-          setNewUrl('');
+  const [parityThreshold, setParityThreshold] = useState('3');
+  const [lookAheadDays, setLookAheadDays] = useState('30');
+  const [currency, setCurrency] = useState('THB');
+
+  const handleAddFromSearch = useCallback(
+    (hotel: HotelSearchResult) => {
+      if (!selectedProperty) return;
+      addMutation.mutate(
+        {
+          property_id: selectedProperty.id,
+          name: hotel.name,
+          google_hotels_url: hotel.name,
         },
-      }
-    );
-  };
+        {
+          onSuccess: () => {
+            // Don't close search - user may want to add more
+          },
+        }
+      );
+    },
+    [selectedProperty, addMutation]
+  );
+
+  const handleAddManual = useCallback(
+    (name: string) => {
+      if (!selectedProperty || !name.trim()) return;
+      addMutation.mutate({
+        property_id: selectedProperty.id,
+        name: name.trim(),
+        google_hotels_url: name.trim(),
+      });
+    },
+    [selectedProperty, addMutation]
+  );
 
   const handleSaveSettings = () => {
     if (!selectedProperty) return;
@@ -75,6 +92,16 @@ export default function Settings() {
       },
     });
   };
+
+  // Check if a hotel is already added as competitor
+  const isAlreadyAdded = useCallback(
+    (hotelName: string) => {
+      return competitors?.some(
+        (c) => c.name.toLowerCase() === hotelName.toLowerCase()
+      );
+    },
+    [competitors]
+  );
 
   if (isLoading) return <PageSkeleton />;
 
@@ -89,56 +116,180 @@ export default function Settings() {
 
       {/* Competitors Management */}
       <div className="rounded-xl bg-surface border border-white/5">
-        <div className="px-5 py-4 border-b border-white/5">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Globe className="w-4 h-4 text-accent" />
-            Competitor Sources
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage the OTA and competitor channels being monitored
-          </p>
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Globe className="w-4 h-4 text-accent" />
+              Competitor Hotels
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {competitors?.length ?? 0} competitor{(competitors?.length ?? 0) !== 1 ? 's' : ''} configured
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSearch(!showSearch)}
+            className={clsx(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              showSearch
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20'
+            )}
+          >
+            {showSearch ? (
+              <>
+                <X className="w-4 h-4" />
+                Close
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                Add Competitor
+              </>
+            )}
+          </button>
         </div>
 
-        {/* Add form */}
-        <div className="px-5 py-4 border-b border-white/5 bg-white/[0.01]">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              placeholder="Competitor name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/50 transition-colors"
-            />
-            <input
-              type="text"
-              placeholder="Source (e.g., Booking.com)"
-              value={newSource}
-              onChange={(e) => setNewSource(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/50 transition-colors"
-            />
-            <input
-              type="text"
-              placeholder="URL (optional)"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/50 transition-colors"
-            />
-            <button
-              onClick={handleAddCompetitor}
-              disabled={addMutation.isPending || !newName.trim() || !newSource.trim()}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              Add
-            </button>
+        {/* Search panel */}
+        {showSearch && (
+          <div className="px-5 py-4 border-b border-white/5 bg-white/[0.02]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search hotels by name (e.g., 'Marriott Bangkok')..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent/50 transition-colors"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
+              )}
+            </div>
+
+            {/* Search results */}
+            {searchResults?.data && searchResults.data.length > 0 && (
+              <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
+                {searchResults.data.map((hotel) => {
+                  const alreadyAdded = isAlreadyAdded(hotel.name);
+                  return (
+                    <div
+                      key={hotel.property_token}
+                      className={clsx(
+                        'flex items-center gap-3 p-3 rounded-lg border transition-all',
+                        alreadyAdded
+                          ? 'bg-success/5 border-success/20'
+                          : 'bg-white/[0.02] border-white/5 hover:border-accent/20 hover:bg-white/[0.04]'
+                      )}
+                    >
+                      {/* Thumbnail */}
+                      {hotel.thumbnail ? (
+                        <img
+                          src={hotel.thumbnail}
+                          alt={hotel.name}
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                          <Globe className="w-5 h-5 text-slate-600" />
+                        </div>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white truncate">
+                            {hotel.name}
+                          </span>
+                          {hotel.stars && (
+                            <span className="flex items-center gap-0.5 text-yellow-500 flex-shrink-0">
+                              {Array.from({ length: hotel.stars }).map((_, i) => (
+                                <Star key={i} className="w-3 h-3 fill-current" />
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          {hotel.address && (
+                            <span className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              {hotel.address}
+                            </span>
+                          )}
+                          {hotel.rate_per_night && (
+                            <span className="text-[10px] text-accent font-rate flex-shrink-0">
+                              {hotel.currency} {hotel.rate_per_night.toLocaleString()}/night
+                            </span>
+                          )}
+                          {hotel.overall_rating && (
+                            <span className="text-[10px] text-slate-400 flex-shrink-0">
+                              {hotel.overall_rating}/5
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Add button */}
+                      <button
+                        onClick={() => handleAddFromSearch(hotel)}
+                        disabled={alreadyAdded || addMutation.isPending}
+                        className={clsx(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0',
+                          alreadyAdded
+                            ? 'bg-success/10 text-success border border-success/20 cursor-default'
+                            : 'bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 disabled:opacity-50'
+                        )}
+                      >
+                        {alreadyAdded ? (
+                          'Added'
+                        ) : (
+                          <>
+                            <Plus className="w-3 h-3" />
+                            Add
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* No results */}
+            {searchQuery.length >= 3 && !isSearching && searchResults?.data?.length === 0 && (
+              <div className="mt-3 text-center py-4">
+                <p className="text-sm text-slate-500">No hotels found for "{searchQuery}"</p>
+              </div>
+            )}
+
+            {/* Quick add manual */}
+            {searchQuery.length >= 3 && (
+              <div className="mt-3 pt-3 border-t border-white/5">
+                <button
+                  onClick={() => {
+                    handleAddManual(searchQuery);
+                    setSearchQuery('');
+                  }}
+                  disabled={addMutation.isPending || isAlreadyAdded(searchQuery)}
+                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-accent transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-3 h-3" />
+                  Can't find it? Add "{searchQuery}" manually
+                </button>
+              </div>
+            )}
+
+            {searchQuery.length < 3 && searchQuery.length > 0 && (
+              <p className="mt-2 text-xs text-slate-600">Type at least 3 characters to search...</p>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Competitors list */}
         <div className="divide-y divide-white/5">
           {competitors?.length === 0 && (
             <div className="px-5 py-8 text-center text-slate-500 text-sm">
-              No competitors configured yet. Add one above.
+              No competitors configured yet. Click "Add Competitor" to search and add hotels.
             </div>
           )}
           {competitors?.map((comp) => (
@@ -151,15 +302,23 @@ export default function Settings() {
                   <span
                     className={clsx(
                       'text-sm font-medium',
-                      comp.enabled ? 'text-slate-200' : 'text-slate-500'
+                      comp.is_active ? 'text-slate-200' : 'text-slate-500 line-through'
                     )}
                   >
                     {comp.name}
                   </span>
-                  <ChannelBadge source={comp.source} />
+                  {comp.is_active ? (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/20">
+                      Inactive
+                    </span>
+                  )}
                 </div>
-                {comp.url && (
-                  <p className="text-[10px] text-slate-600 truncate mt-0.5">{comp.url}</p>
+                {comp.google_hotels_url && comp.google_hotels_url !== comp.name && (
+                  <p className="text-[10px] text-slate-600 truncate mt-0.5">{comp.google_hotels_url}</p>
                 )}
               </div>
 
@@ -168,13 +327,13 @@ export default function Settings() {
                 onClick={() =>
                   toggleMutation.mutate({
                     competitorId: comp.id,
-                    enabled: !comp.enabled,
+                    enabled: !comp.is_active,
                   })
                 }
                 className="text-slate-400 hover:text-accent transition-colors"
-                title={comp.enabled ? 'Disable' : 'Enable'}
+                title={comp.is_active ? 'Disable' : 'Enable'}
               >
-                {comp.enabled ? (
+                {comp.is_active ? (
                   <ToggleRight className="w-6 h-6 text-accent" />
                 ) : (
                   <ToggleLeft className="w-6 h-6 text-slate-600" />
@@ -215,8 +374,8 @@ export default function Settings() {
               Refresh Schedule
             </label>
             <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-slate-300 font-rate">
-              {selectedProperty?.refreshCron ?? '0 */4 * * *'}
-              <span className="text-slate-500 ml-2">(Every 4 hours)</span>
+              3x daily
+              <span className="text-slate-500 ml-2">(6:00 AM, 2:00 PM, 10:00 PM)</span>
             </div>
           </div>
 
@@ -236,7 +395,7 @@ export default function Settings() {
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white font-rate focus:outline-none focus:border-accent/50 transition-colors"
             />
             <p className="text-[10px] text-slate-600 mt-1">
-              Rate differences below this threshold will trigger parity alerts
+              Rate differences above this threshold will trigger parity alerts
             </p>
           </div>
 

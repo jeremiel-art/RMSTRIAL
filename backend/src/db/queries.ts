@@ -198,9 +198,31 @@ export interface PaginatedResult<T> {
 export async function getProperties(): Promise<Property[]> {
   const db = getPool();
   const result = await db.query<Property>(
-    'SELECT id, name, address, google_hotels_url, created_at FROM properties ORDER BY created_at DESC'
+    `SELECT id, name, address, google_hotels_url, created_at FROM properties
+     ORDER BY
+       CASE WHEN name ILIKE '%public house bangkok%' THEN 0 ELSE 1 END,
+       created_at ASC`
   );
   return result.rows;
+}
+
+export async function seedDefaultProperty(): Promise<Property> {
+  const db = getPool();
+  // Check if Public House Bangkok already exists
+  const existing = await db.query<Property>(
+    "SELECT * FROM properties WHERE name ILIKE '%public house bangkok%' LIMIT 1"
+  );
+  if (existing.rows.length > 0) {
+    return existing.rows[0];
+  }
+  // Create it
+  const result = await db.query<Property>(
+    `INSERT INTO properties (name, address, google_hotels_url)
+     VALUES ($1, $2, $3)
+     RETURNING id, name, address, google_hotels_url, created_at`,
+    ['Public House Bangkok', 'Bangkok, Thailand', 'Public House Bangkok']
+  );
+  return result.rows[0];
 }
 
 export async function getPropertyById(id: string): Promise<Property | null> {

@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import { config } from './utils/config.js';
 import { logger } from './utils/logger.js';
 import { startScheduler, stopScheduler } from './scheduler/cronJobs.js';
-import { closePool } from './db/queries.js';
+import { closePool, seedDefaultProperty } from './db/queries.js';
 
 import ratesRouter from './routes/rates.js';
 import refreshRouter from './routes/refresh.js';
@@ -89,6 +89,11 @@ const server = app.listen(config.PORT, () => {
     env: config.NODE_ENV,
     port: config.PORT,
   });
+
+  // Seed default property (Public House Bangkok)
+  seedDefaultProperty()
+    .then((prop) => logger.info('Default property ready', { id: prop.id, name: prop.name }))
+    .catch((err) => logger.warn('Could not seed default property', { error: err instanceof Error ? err.message : String(err) }));
 
   // Start cron scheduler
   startScheduler();

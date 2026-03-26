@@ -1,75 +1,76 @@
 export interface Property {
   id: string;
   name: string;
-  currency: string;
-  timezone: string;
-  parityThreshold: number;
-  lookAheadDays: number;
-  refreshCron: string;
-  createdAt: string;
-  updatedAt: string;
+  address: string | null;
+  google_hotels_url: string | null;
+  created_at: string;
 }
 
 export interface Competitor {
   id: string;
-  propertyId: string;
+  property_id: string;
   name: string;
-  source: string;
-  url: string;
-  enabled: boolean;
-  createdAt: string;
+  google_hotels_url: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface RateSnapshot {
   id: string;
-  competitorId: string;
-  competitorName: string;
+  competitor_id: string;
+  property_id: string;
   source: string;
-  checkIn: string;
-  checkOut: string;
-  roomType: string;
-  rate: number;
+  check_in_date: string;
+  check_out_date: string;
+  room_type: string | null;
+  rate_amount: number | null;
   currency: string;
-  fetchedAt: string;
+  is_available: boolean;
+  scraped_at: string;
+  refresh_id: string | null;
 }
 
 export interface RefreshLog {
   id: string;
-  propertyId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  startedAt: string;
-  completedAt: string | null;
-  ratesCollected: number;
-  errors: number;
+  property_id: string;
+  trigger_type: string;
+  status: 'running' | 'completed' | 'failed';
+  started_at: string;
+  completed_at: string | null;
+  total_competitors: number;
+  successful_scrapes: number;
+  failed_scrapes: number;
+  error_log: string | null;
 }
 
 export interface ParityAlert {
   id: string;
-  propertyId: string;
-  competitorId: string;
-  competitorName: string;
-  source: string;
-  checkIn: string;
-  roomType: string;
-  ourRate: number;
-  theirRate: number;
-  differencePercent: number;
-  status: 'new' | 'acknowledged';
-  detectedAt: string;
-  acknowledgedAt: string | null;
+  property_id: string;
+  competitor_id: string;
+  competitor_name?: string;
+  rate_snapshot_id: string | null;
+  our_rate: number;
+  competitor_rate: number;
+  difference_amount: number;
+  difference_pct: number;
+  check_in_date: string;
+  room_type: string | null;
+  alert_status: 'new' | 'acknowledged';
+  detected_at: string;
 }
 
 export interface RateChange {
   id: string;
-  competitorId: string;
-  competitorName: string;
-  source: string;
-  checkIn: string;
-  roomType: string;
-  oldRate: number;
-  newRate: number;
-  changePercent: number;
-  detectedAt: string;
+  competitor_id: string;
+  competitor_name?: string;
+  property_id: string;
+  check_in_date: string;
+  room_type: string | null;
+  old_rate: number;
+  new_rate: number;
+  change_amount: number;
+  change_pct: number;
+  detected_at: string;
 }
 
 export interface CalendarDay {
@@ -88,39 +89,40 @@ export interface CalendarChannel {
 }
 
 export interface DashboardSummary {
-  parityScore: number;
-  ratePosition: number;
-  totalPositions: number;
-  activeAlerts: number;
-  competitorCount: number;
-  lastRefresh: string | null;
-  nextRefresh: string | null;
+  total_competitors: number;
+  active_competitors: number;
+  total_snapshots_today: number;
+  new_parity_alerts: number;
+  last_refresh: RefreshLog | null;
+  rate_changes_24h: number;
+  avg_competitor_rate: number | null;
+  min_competitor_rate: number | null;
+  max_competitor_rate: number | null;
 }
 
 export interface CheapestSummary {
-  daysWithParity: number;
-  totalDays: number;
-  mostFrequentCheapest: string;
-  avgUndercutAmount: number;
-  ourAvgRate: number;
+  competitor_id: string;
+  competitor_name: string;
+  cheapest_count: number;
+  avg_rate: number;
+  min_rate: number;
+  max_rate: number;
 }
 
 export interface RateGridRow {
-  competitorId: string;
-  competitorName: string;
-  source: string;
-  rates: Record<string, {
-    rate: number;
-    previousRate: number | null;
-    change: number | null;
-    changePercent: number | null;
-  } | null>;
+  competitor_id: string;
+  competitor_name: string;
+  check_in_date: string;
+  room_type: string | null;
+  rate_amount: number | null;
+  currency: string;
+  is_available: boolean;
+  scraped_at: string;
 }
 
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  limit: number;
+  offset: number;
 }

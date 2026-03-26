@@ -48,7 +48,7 @@ export function useDashboardSummary(propertyId: string | undefined) {
 // ---- Rate Grid ----
 
 export function useRatesGrid(propertyId: string | undefined) {
-  return useQuery<{ ourRates: Record<string, number | null>; competitors: RateGridRow[]; dates: string[] }>({
+  return useQuery<RateGridRow[]>({
     queryKey: ['rates-grid', propertyId],
     queryFn: () => apiFetch(`/rates/grid?property_id=${propertyId}`),
     enabled: !!propertyId,
@@ -114,7 +114,10 @@ export function useAcknowledgeAlert() {
 export function useCompetitors(propertyId: string | undefined) {
   return useQuery<Competitor[]>({
     queryKey: ['competitors', propertyId],
-    queryFn: () => apiFetch(`/competitors?property_id=${propertyId}`),
+    queryFn: async () => {
+      const res = await apiFetch<{ data: Competitor[] }>(`/competitors?property_id=${propertyId}`);
+      return res.data;
+    },
     enabled: !!propertyId,
   });
 }
@@ -122,17 +125,14 @@ export function useCompetitors(propertyId: string | undefined) {
 export function useAddCompetitor() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { property_id?: string; propertyId?: string; name: string; google_hotels_url?: string; source?: string; url?: string }) =>
+    mutationFn: (data: { property_id: string; name: string; google_hotels_url: string }) =>
       apiFetch('/competitors', {
         method: 'POST',
-        body: JSON.stringify({
-          property_id: data.property_id ?? data.propertyId,
-          name: data.name,
-          google_hotels_url: data.google_hotels_url ?? data.url ?? '',
-        }),
+        body: JSON.stringify(data),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['competitors'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
   });
 }
@@ -144,6 +144,7 @@ export function useDeleteCompetitor() {
       apiFetch(`/competitors/${competitorId}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['competitors'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
   });
 }
@@ -188,7 +189,7 @@ export function useCalendar(propertyId: string | undefined, month: string) {
 }
 
 export function useCheapestSummary(propertyId: string | undefined, month: string) {
-  return useQuery<CheapestSummary>({
+  return useQuery<CheapestSummary[]>({
     queryKey: ['cheapest-summary', propertyId, month],
     queryFn: () => apiFetch(`/calendar/cheapest-summary?property_id=${propertyId}&month=${month}`),
     enabled: !!propertyId,
@@ -200,14 +201,23 @@ export function useCheapestSummary(propertyId: string | undefined, month: string
 export function useRefresh() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (propertyId: string) =>
-      apiFetch<RefreshLog>('/refresh', {
+    mutationFn: async (propertyId: string) => {
+      const res = await apiFetch<{ message: string; refresh_id?: string; property_id?: string }>('/refresh', {
         method: 'POST',
         body: JSON.stringify({ property_id: propertyId }),
-      }),
+      });
+      return res;
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      qc.invalidateQueries({ queryKey: ['rates-grid'] });
+      // Invalidate all data queries after refresh starts
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        qc.invalidateQueries({ queryKey: ['rates-grid'] });
+        qc.invalidateQueries({ queryKey: ['rate-history'] });
+        qc.invalidateQueries({ queryKey: ['parity-alerts'] });
+        qc.invalidateQueries({ queryKey: ['rate-changes'] });
+        qc.invalidateQueries({ queryKey: ['calendar'] });
+      }, 2000);
     },
   });
 }
@@ -272,7 +282,7 @@ export function useCreateProperty() {
 export function useUpdateProperty() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ propertyId, data }: { propertyId: string; data: Partial<Property> }) =>
+    mutationFn: ({ propertyId, data }: { propertyId: string; data: Record<string, unknown> }) =>
       apiFetch(`/properties/${propertyId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

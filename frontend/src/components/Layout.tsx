@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -15,8 +15,10 @@ import {
   Menu,
   X,
   Sparkles,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
-import { useProperties, useRefresh } from '../hooks/useApi';
+import { useProperties, useRefresh, useRefreshStatus } from '../hooks/useApi';
 import type { Property } from '../types';
 
 interface PropertyContextValue {
@@ -50,6 +52,14 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const refreshMutation = useRefresh();
+  const [activeRefreshId, setActiveRefreshId] = useState<string | undefined>();
+  const { data: refreshStatus } = useRefreshStatus(activeRefreshId);
+
+  // Track refresh completion
+  const [refreshMessage, setRefreshMessage] = useState<{
+    type: 'success' | 'error' | 'running';
+    text: string;
+  } | null>(null);
 
   const selectedProperty =
     properties?.find((p) => p.id === selectedId) ?? properties?.[0] ?? null;
@@ -58,11 +68,64 @@ export default function Layout() {
     setSelectedId(selectedProperty.id);
   }
 
+  // Watch refresh status
+  useEffect(() => {
+    if (refreshStatus) {
+      if (refreshStatus.status === 'completed') {
+        setRefreshMessage({
+          type: 'success',
+          text: `Refresh complete! ${refreshStatus.successful_scrapes} scraped, ${refreshStatus.failed_scrapes} failed`,
+        });
+        setActiveRefreshId(undefined);
+        // Auto-clear after 5s
+        setTimeout(() => setRefreshMessage(null), 5000);
+      } else if (refreshStatus.status === 'failed') {
+        setRefreshMessage({
+          type: 'error',
+          text: 'Refresh failed. Check logs for details.',
+        });
+        setActiveRefreshId(undefined);
+        setTimeout(() => setRefreshMessage(null), 5000);
+      } else if (refreshStatus.status === 'running') {
+        setRefreshMessage({
+          type: 'running',
+          text: `Scraping ${refreshStatus.total_competitors} competitor(s)...`,
+        });
+      }
+    }
+  }, [refreshStatus]);
+
   const handleRefresh = () => {
     if (selectedProperty) {
-      refreshMutation.mutate(selectedProperty.id);
+      setRefreshMessage({ type: 'running', text: 'Starting refresh...' });
+      refreshMutation.mutate(selectedProperty.id, {
+        onSuccess: (data) => {
+          if (data.refresh_id) {
+            setActiveRefreshId(data.refresh_id);
+          } else {
+            setRefreshMessage({ type: 'running', text: 'Refresh in progress...' });
+            // If we didn't get an ID back, just show success after a delay
+            setTimeout(() => {
+              setRefreshMessage({
+                type: 'success',
+                text: 'Refresh triggered successfully',
+              });
+              setTimeout(() => setRefreshMessage(null), 5000);
+            }, 3000);
+          }
+        },
+        onError: (err) => {
+          setRefreshMessage({
+            type: 'error',
+            text: err instanceof Error ? err.message : 'Refresh failed',
+          });
+          setTimeout(() => setRefreshMessage(null), 5000);
+        },
+      });
     }
   };
+
+  const isRefreshing = refreshMutation.isPending || refreshMessage?.type === 'running';
 
   return (
     <PropertyContext.Provider
@@ -176,7 +239,7 @@ export default function Layout() {
                     <button
                       key={p.id}
                       className={clsx(
-                        'w-full text-left px-3 py-2 text-sm hover:bg-white/5 transition-colors',
+                        'w-full text-left px-3 py-2 text-sm hover:bg-white/5 transition-colors flex items-center gap-2',
                         p.id === selectedProperty?.id
                           ? 'text-accent'
                           : 'text-slate-300'
@@ -187,6 +250,11 @@ export default function Layout() {
                       }}
                     >
                       {p.name}
+                      {p.name.toLowerCase().includes('public house') && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+                          My Hotel
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -195,10 +263,29 @@ export default function Layout() {
 
             <div className="flex-1" />
 
-            {/* Refresh */}
+            {/* Refresh status message */}
+            {refreshMessage && (
+              <div
+                className={clsx(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium animate-fade-in',
+                  refreshMessage.type === 'success' && 'bg-success/10 text-success border border-success/20',
+                  refreshMessage.type === 'error' && 'bg-danger/10 text-danger border border-danger/20',
+                  refreshMessage.type === 'running' && 'bg-accent/10 text-accent border border-accent/20'
+                )}
+              >
+                {refreshMessage.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                {refreshMessage.type === 'error' && <AlertCircle className="w-3.5 h-3.5" />}
+                {refreshMessage.type === 'running' && (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                )}
+                {refreshMessage.text}
+              </div>
+            )}
+
+            {/* Refresh button */}
             <button
               onClick={handleRefresh}
-              disabled={refreshMutation.isPending}
+              disabled={isRefreshing}
               className={clsx(
                 'flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-300',
                 'bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 hover:border-accent/40',
@@ -209,10 +296,10 @@ export default function Layout() {
               <RefreshCw
                 className={clsx(
                   'w-3.5 h-3.5',
-                  refreshMutation.isPending && 'animate-spin'
+                  isRefreshing && 'animate-spin'
                 )}
               />
-              {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Rates'}
+              {isRefreshing ? 'Refreshing...' : 'Refresh Rates'}
             </button>
           </header>
 

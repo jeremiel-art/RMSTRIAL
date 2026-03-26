@@ -1,12 +1,42 @@
+import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { useSelectedProperty } from '../components/Layout';
 import { useRatesGrid } from '../hooks/useApi';
 import RateCell from '../components/RateCell';
 import { PageSkeleton } from '../components/LoadingSkeleton';
+import type { RateGridRow } from '../types';
+
+// Transform flat rate grid rows into grouped structure for display
+function buildGridView(rows: RateGridRow[]) {
+  const dates = [...new Set(rows.map((r) => r.check_in_date))].sort();
+  const competitorMap = new Map<string, { name: string; rates: Map<string, RateGridRow> }>();
+
+  for (const row of rows) {
+    const key = row.competitor_id ?? row.competitor_name;
+    if (!competitorMap.has(key)) {
+      competitorMap.set(key, { name: row.competitor_name, rates: new Map() });
+    }
+    competitorMap.get(key)!.rates.set(row.check_in_date, row);
+  }
+
+  return {
+    dates,
+    competitors: Array.from(competitorMap.entries()).map(([id, data]) => ({
+      id,
+      name: data.name,
+      rates: data.rates,
+    })),
+  };
+}
 
 export default function RateGrid() {
   const { selectedProperty } = useSelectedProperty();
-  const { data: grid, isLoading } = useRatesGrid(selectedProperty?.id);
+  const { data: rawGrid, isLoading } = useRatesGrid(selectedProperty?.id);
+
+  const grid = useMemo(() => {
+    if (!rawGrid || rawGrid.length === 0) return null;
+    return buildGridView(rawGrid);
+  }, [rawGrid]);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -61,54 +91,36 @@ export default function RateGrid() {
                     key={date}
                     className="px-2 py-3 text-center text-xs font-medium text-slate-400 min-w-[85px]"
                   >
-                    <div className="font-rate">{format(new Date(date), 'MMM d')}</div>
+                    <div className="font-rate">{format(new Date(date + 'T00:00:00'), 'MMM d')}</div>
                     <div className="text-[10px] text-slate-600">
-                      {format(new Date(date), 'EEE')}
+                      {format(new Date(date + 'T00:00:00'), 'EEE')}
                     </div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-accent/20 bg-accent/5">
-                <td className="sticky left-0 bg-surface z-10 px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_6px_rgba(56,189,248,0.5)]" />
-                    <span className="font-semibold text-accent text-xs">Our Rate</span>
-                  </div>
-                </td>
-                {grid.dates.map((date) => {
-                  const rate = grid.ourRates[date];
-                  return (
-                    <td key={date} className="px-2 py-2.5 text-center">
-                      <span className="font-rate font-bold text-accent text-sm">
-                        {rate != null ? `$${rate.toFixed(0)}` : '--'}
-                      </span>
-                    </td>
-                  );
-                })}
-              </tr>
               {grid.competitors.map((comp) => (
                 <tr
-                  key={comp.competitorId}
+                  key={comp.id}
                   className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
                 >
                   <td className="sticky left-0 bg-surface z-10 px-4 py-2.5">
                     <div className="text-xs font-medium text-slate-300 truncate">
-                      {comp.competitorName}
+                      {comp.name}
                     </div>
-                    <div className="text-[10px] text-slate-500">{comp.source}</div>
+                    <div className="text-[10px] text-slate-500">Google Hotels</div>
                   </td>
                   {grid.dates.map((date) => {
-                    const rateData = comp.rates[date];
+                    const rateData = comp.rates.get(date);
                     return (
                       <td key={date} className="px-1 py-1">
                         <RateCell
-                          rate={rateData?.rate ?? null}
-                          ourRate={grid.ourRates[date] ?? null}
-                          previousRate={rateData?.previousRate}
-                          change={rateData?.change}
-                          changePercent={rateData?.changePercent}
+                          rate={rateData?.rate_amount ?? null}
+                          ourRate={null}
+                          previousRate={null}
+                          change={null}
+                          changePercent={null}
                         />
                       </td>
                     );

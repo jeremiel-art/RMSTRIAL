@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
-import { getCompetitors, createCompetitor, deleteCompetitor } from '../db/queries.js';
+import { getCompetitors, createCompetitor, deleteCompetitor, toggleCompetitor } from '../db/queries.js';
 
 const router = Router();
 
@@ -81,6 +81,45 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     res.json({ data: competitor, message: 'Competitor deactivated' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── PATCH /:id ────────────────────────────────────────────────────────────
+
+const toggleCompetitorSchema = z.object({
+  is_active: z.boolean(),
+});
+
+router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const idParsed = deleteCompetitorSchema.safeParse(req.params);
+    if (!idParsed.success) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: idParsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const bodyParsed = toggleCompetitorSchema.safeParse(req.body);
+    if (!bodyParsed.success) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: bodyParsed.error.flatten().fieldErrors,
+      });
+      return;
+    }
+
+    const competitor = await toggleCompetitor(idParsed.data.id, bodyParsed.data.is_active);
+
+    if (!competitor) {
+      res.status(404).json({ error: 'Competitor not found' });
+      return;
+    }
+
+    res.json({ data: competitor });
   } catch (err) {
     next(err);
   }

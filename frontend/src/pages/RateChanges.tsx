@@ -22,7 +22,7 @@ export default function RateChanges() {
   const filtered = useMemo(() => {
     if (!changes) return [];
     if (selectedCompetitor === 'all') return changes;
-    return changes.filter((c) => c.competitorId === selectedCompetitor);
+    return changes.filter((c) => c.competitor_id === selectedCompetitor);
   }, [changes, selectedCompetitor]);
 
   if (isLoading) return <PageSkeleton />;
@@ -84,9 +84,9 @@ export default function RateChanges() {
           </div>
         ) : (
           filtered.map((change) => {
-            const isIncrease = change.newRate > change.oldRate;
-            const absDiff = Math.abs(change.newRate - change.oldRate);
-            const absPercent = Math.abs(change.changePercent);
+            const isIncrease = Number(change.new_rate) > Number(change.old_rate);
+            const absDiff = Math.abs(Number(change.change_amount));
+            const absPercent = Math.abs(Number(change.change_pct));
 
             return (
               <div
@@ -116,22 +116,22 @@ export default function RateChanges() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-white">
-                      {change.competitorName}
+                      {change.competitor_name ?? 'Unknown'}
                     </span>
-                    <ChannelBadge source={change.source} />
+                    <ChannelBadge source="Google Hotels" />
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
                     <span>
                       Check-in:{' '}
                       <span className="font-rate text-slate-400">
-                        {format(new Date(change.checkIn), 'MMM d, yyyy')}
+                        {format(new Date(change.check_in_date + 'T00:00:00'), 'MMM d, yyyy')}
                       </span>
                     </span>
-                    {change.roomType && (
-                      <span className="text-slate-600">|</span>
-                    )}
-                    {change.roomType && (
-                      <span>{change.roomType}</span>
+                    {change.room_type && (
+                      <>
+                        <span className="text-slate-600">|</span>
+                        <span>{change.room_type}</span>
+                      </>
                     )}
                   </div>
                 </div>
@@ -139,7 +139,7 @@ export default function RateChanges() {
                 {/* Rate change */}
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="font-rate text-sm text-slate-400">
-                    ${change.oldRate.toFixed(0)}
+                    ${Number(change.old_rate).toFixed(0)}
                   </span>
                   <ArrowRight
                     className={clsx(
@@ -153,7 +153,7 @@ export default function RateChanges() {
                       isIncrease ? 'text-danger' : 'text-success'
                     )}
                   >
-                    ${change.newRate.toFixed(0)}
+                    ${Number(change.new_rate).toFixed(0)}
                   </span>
                 </div>
 
@@ -172,9 +172,9 @@ export default function RateChanges() {
 
                 {/* Timestamp */}
                 <div className="text-[10px] font-rate text-slate-600 flex-shrink-0 text-right w-16">
-                  {format(new Date(change.detectedAt), 'HH:mm')}
+                  {format(new Date(change.detected_at), 'HH:mm')}
                   <br />
-                  {format(new Date(change.detectedAt), 'MMM d')}
+                  {format(new Date(change.detected_at), 'MMM d')}
                 </div>
               </div>
             );
