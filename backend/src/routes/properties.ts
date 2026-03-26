@@ -27,7 +27,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const property = await getPropertyById(req.params.id);
+    const property = await getPropertyById(req.params.id as string);
     if (!property) {
       res.status(404).json({ error: 'Property not found' });
       return;
