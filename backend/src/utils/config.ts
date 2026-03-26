@@ -49,6 +49,7 @@ export const config = {
   BASE_CURRENCY: envString('BASE_CURRENCY', 'THB'),
 
   CHROME_BIN: envString('CHROME_BIN', ''),
+  CHROMEDRIVER_PATH: envString('CHROMEDRIVER_PATH', ''),
 } as const;
 
 export type Config = typeof config;

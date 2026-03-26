@@ -147,10 +147,18 @@ async function createDriver(): Promise<WebDriver> {
     options.setChromeBinaryPath(chromeBin);
   }
 
-  const driver = await new Builder()
+  // Use CHROMEDRIVER_PATH env var if set
+  const chromeDriverPath = process.env.CHROMEDRIVER_PATH;
+  const builder = new Builder()
     .forBrowser(Browser.CHROME)
-    .setChromeOptions(options)
-    .build();
+    .setChromeOptions(options);
+
+  if (chromeDriverPath) {
+    const service = new chrome.ServiceBuilder(chromeDriverPath);
+    builder.setChromeService(service);
+  }
+
+  const driver = await builder.build();
 
   // Set page load timeout
   await driver.manage().setTimeouts({
