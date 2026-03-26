@@ -40,7 +40,7 @@ export function useProperties() {
 export function useDashboardSummary(propertyId: string | undefined) {
   return useQuery<DashboardSummary>({
     queryKey: ['dashboard-summary', propertyId],
-    queryFn: () => apiFetch(`/properties/${propertyId}/dashboard`),
+    queryFn: () => apiFetch(`/dashboard/summary?property_id=${propertyId}`),
     enabled: !!propertyId,
   });
 }
@@ -50,7 +50,7 @@ export function useDashboardSummary(propertyId: string | undefined) {
 export function useRatesGrid(propertyId: string | undefined) {
   return useQuery<{ ourRates: Record<string, number | null>; competitors: RateGridRow[]; dates: string[] }>({
     queryKey: ['rates-grid', propertyId],
-    queryFn: () => apiFetch(`/properties/${propertyId}/rates/grid`),
+    queryFn: () => apiFetch(`/rates/grid?property_id=${propertyId}`),
     enabled: !!propertyId,
   });
 }
@@ -66,7 +66,7 @@ export function useRateHistory(
     queryKey: ['rate-history', competitorId, checkIn, days],
     queryFn: () =>
       apiFetch(
-        `/competitors/${competitorId}/history?checkIn=${checkIn ?? ''}&days=${days}`
+        `/rates/history?competitor_id=${competitorId}&check_in=${checkIn ?? ''}&days=${days}`
       ),
     enabled: !!competitorId,
   });
@@ -78,7 +78,7 @@ export function useRateHistoryAll(propertyId: string | undefined, from: string, 
     competitors: { competitorId: string; competitorName: string; source: string; rates: { date: string; rate: number }[] }[];
   }>({
     queryKey: ['rate-history-all', propertyId, from, to],
-    queryFn: () => apiFetch(`/properties/${propertyId}/rates/history?from=${from}&to=${to}`),
+    queryFn: () => apiFetch(`/rates/history?property_id=${propertyId}&from=${from}&to=${to}`),
     enabled: !!propertyId,
   });
 }
@@ -88,10 +88,11 @@ export function useRateHistoryAll(propertyId: string | undefined, from: string, 
 export function useParityAlerts(propertyId: string | undefined, status?: string) {
   return useQuery<ParityAlert[]>({
     queryKey: ['parity-alerts', propertyId, status],
-    queryFn: () =>
-      apiFetch(
-        `/properties/${propertyId}/alerts${status ? `?status=${status}` : ''}`
-      ),
+    queryFn: () => {
+      const params = new URLSearchParams({ property_id: propertyId! });
+      if (status) params.set('status', status);
+      return apiFetch(`/parity?${params.toString()}`);
+    },
     enabled: !!propertyId,
   });
 }
@@ -100,7 +101,7 @@ export function useAcknowledgeAlert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (alertId: string) =>
-      apiFetch(`/alerts/${alertId}/acknowledge`, { method: 'PATCH' }),
+      apiFetch(`/parity/${alertId}/acknowledge`, { method: 'PATCH' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['parity-alerts'] });
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
@@ -113,7 +114,7 @@ export function useAcknowledgeAlert() {
 export function useCompetitors(propertyId: string | undefined) {
   return useQuery<Competitor[]>({
     queryKey: ['competitors', propertyId],
-    queryFn: () => apiFetch(`/properties/${propertyId}/competitors`),
+    queryFn: () => apiFetch(`/competitors?property_id=${propertyId}`),
     enabled: !!propertyId,
   });
 }
@@ -121,10 +122,14 @@ export function useCompetitors(propertyId: string | undefined) {
 export function useAddCompetitor() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { propertyId: string; name: string; source: string; url: string }) =>
-      apiFetch(`/properties/${data.propertyId}/competitors`, {
+    mutationFn: (data: { property_id?: string; propertyId?: string; name: string; google_hotels_url?: string; source?: string; url?: string }) =>
+      apiFetch('/competitors', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          property_id: data.property_id ?? data.propertyId,
+          name: data.name,
+          google_hotels_url: data.google_hotels_url ?? data.url ?? '',
+        }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['competitors'] });
@@ -149,7 +154,7 @@ export function useToggleCompetitor() {
     mutationFn: ({ competitorId, enabled }: { competitorId: string; enabled: boolean }) =>
       apiFetch(`/competitors/${competitorId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ is_active: enabled }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['competitors'] });
@@ -160,13 +165,14 @@ export function useToggleCompetitor() {
 // ---- Rate Changes ----
 
 export function useRateChanges(propertyId: string | undefined, from?: string, to?: string) {
-  const params = new URLSearchParams();
-  if (from) params.set('from', from);
-  if (to) params.set('to', to);
-  const qs = params.toString();
   return useQuery<RateChange[]>({
     queryKey: ['rate-changes', propertyId, from, to],
-    queryFn: () => apiFetch(`/properties/${propertyId}/rate-changes${qs ? `?${qs}` : ''}`),
+    queryFn: () => {
+      const params = new URLSearchParams({ property_id: propertyId! });
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      return apiFetch(`/history/rate-changes?${params.toString()}`);
+    },
     enabled: !!propertyId,
   });
 }
@@ -176,7 +182,7 @@ export function useRateChanges(propertyId: string | undefined, from?: string, to
 export function useCalendar(propertyId: string | undefined, month: string) {
   return useQuery<CalendarDay[]>({
     queryKey: ['calendar', propertyId, month],
-    queryFn: () => apiFetch(`/properties/${propertyId}/calendar?month=${month}`),
+    queryFn: () => apiFetch(`/calendar?property_id=${propertyId}&month=${month}`),
     enabled: !!propertyId,
   });
 }
@@ -184,7 +190,7 @@ export function useCalendar(propertyId: string | undefined, month: string) {
 export function useCheapestSummary(propertyId: string | undefined, month: string) {
   return useQuery<CheapestSummary>({
     queryKey: ['cheapest-summary', propertyId, month],
-    queryFn: () => apiFetch(`/properties/${propertyId}/calendar/summary?month=${month}`),
+    queryFn: () => apiFetch(`/calendar/cheapest-summary?property_id=${propertyId}&month=${month}`),
     enabled: !!propertyId,
   });
 }
@@ -195,7 +201,10 @@ export function useRefresh() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (propertyId: string) =>
-      apiFetch<RefreshLog>(`/properties/${propertyId}/refresh`, { method: 'POST' }),
+      apiFetch<RefreshLog>('/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ property_id: propertyId }),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
       qc.invalidateQueries({ queryKey: ['rates-grid'] });
@@ -206,12 +215,54 @@ export function useRefresh() {
 export function useRefreshStatus(refreshId: string | undefined) {
   return useQuery<RefreshLog>({
     queryKey: ['refresh-status', refreshId],
-    queryFn: () => apiFetch(`/refresh/${refreshId}`),
+    queryFn: () => apiFetch(`/refresh/${refreshId}/status`),
     enabled: !!refreshId,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data && (data.status === 'completed' || data.status === 'failed')) return false;
       return 3000;
+    },
+  });
+}
+
+// ---- Hotel Search ----
+
+export interface HotelSearchResult {
+  property_token: string;
+  name: string;
+  address: string;
+  overall_rating: number | null;
+  stars: number | null;
+  thumbnail: string | null;
+  rate_per_night: number | null;
+  currency: string;
+  reviews: number | null;
+  amenities: string[];
+}
+
+export function useSearchHotels(query: string, checkIn?: string, checkOut?: string) {
+  const params = new URLSearchParams({ q: query });
+  if (checkIn) params.set('check_in', checkIn);
+  if (checkOut) params.set('check_out', checkOut);
+  return useQuery<{ data: HotelSearchResult[] }>({
+    queryKey: ['search-hotels', query, checkIn, checkOut],
+    queryFn: () => apiFetch(`/search/hotels?${params.toString()}`),
+    enabled: query.length >= 3,
+  });
+}
+
+// ---- Create Property ----
+
+export function useCreateProperty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; address?: string; google_hotels_url?: string }) =>
+      apiFetch<{ data: Property }>('/properties', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['properties'] });
     },
   });
 }

@@ -13,6 +13,8 @@ import historyRouter from './routes/history.js';
 import competitorsRouter from './routes/competitors.js';
 import calendarRouter from './routes/calendar.js';
 import dashboardRouter from './routes/dashboard.js';
+import searchRouter from './routes/search.js';
+import propertiesRouter from './routes/properties.js';
 
 // ── App Setup ───────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ app.use('/api/history', historyRouter);
 app.use('/api/competitors', competitorsRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/search', searchRouter);
+app.use('/api/properties', propertiesRouter);
 
 // ── 404 Handler ─────────────────────────────────────────────────────────────
 

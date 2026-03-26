@@ -13,7 +13,7 @@ const listCompetitorsSchema = z.object({
 const createCompetitorSchema = z.object({
   property_id: z.string().uuid('property_id must be a valid UUID'),
   name: z.string().min(1, 'name is required').max(255),
-  google_hotels_url: z.string().url('google_hotels_url must be a valid URL'),
+  google_hotels_url: z.string().min(1, 'google_hotels_url (property token) is required').max(500),
 });
 
 const deleteCompetitorSchema = z.object({

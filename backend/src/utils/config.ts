@@ -47,6 +47,8 @@ export const config = {
   PARITY_THRESHOLD_PCT: envFloat('PARITY_THRESHOLD_PCT', 2),
   LOOK_AHEAD_DAYS: envArray('LOOK_AHEAD_DAYS', [1, 3, 7, 14, 30, 60, 90]),
   BASE_CURRENCY: envString('BASE_CURRENCY', 'THB'),
+
+  SERPAPI_API_KEY: envString('SERPAPI_API_KEY', ''),
 } as const;
 
 export type Config = typeof config;

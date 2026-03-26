@@ -14,6 +14,7 @@ import {
   Hotel,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { useProperties, useRefresh } from '../hooks/useApi';
 import type { Property } from '../types';
@@ -34,6 +35,7 @@ export function useSelectedProperty() {
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/setup', label: 'Setup Wizard', icon: Sparkles },
   { to: '/rate-grid', label: 'Rate Grid', icon: Grid3X3 },
   { to: '/rate-history', label: 'Rate History', icon: TrendingUp },
   { to: '/parity-alerts', label: 'Parity Alerts', icon: AlertTriangle },

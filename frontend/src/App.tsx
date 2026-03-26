@@ -7,12 +7,14 @@ import ParityAlerts from './pages/ParityAlerts';
 import RateChanges from './pages/RateChanges';
 import Calendar from './pages/Calendar';
 import Settings from './pages/Settings';
+import Setup from './pages/Setup';
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/setup" element={<Setup />} />
         <Route path="/rate-grid" element={<RateGrid />} />
         <Route path="/rate-history" element={<RateHistory />} />
         <Route path="/parity-alerts" element={<ParityAlerts />} />
